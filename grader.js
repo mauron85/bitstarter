@@ -24,6 +24,7 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -36,8 +37,22 @@ var assertFileExists = function(infile) {
     return instr;
 };
 
-var cheerioHtmlFile = function(htmlfile) {
-    return cheerio.load(fs.readFileSync(htmlfile));
+var localHtmlFile = function(htmlfile, callback) {
+  console.log('Reading local file: %s', htmlfile);
+  fs.readFile(htmlfile, function (err, data) {
+    if (err) throw err;
+    callback(data);
+  });
+};
+
+var restlerHtmlFile = function(url, callback) {
+  console.log('Remotely downloading file: %s', url);
+  rest.get(url).on('complete', function(result) {
+    if (result instanceof Error) {
+        throw result;
+    }
+    callback(result[0].message);
+  });
 };
 
 var loadChecks = function(checksfile) {
@@ -45,7 +60,7 @@ var loadChecks = function(checksfile) {
 };
 
 var checkHtmlFile = function(htmlfile, checksfile) {
-    $ = cheerioHtmlFile(htmlfile);
+    $ = cheerio.load(htmlfile);
     var checks = loadChecks(checksfile).sort();
     var out = {};
     for(var ii in checks) {
@@ -62,13 +77,26 @@ var clone = function(fn) {
 };
 
 if(require.main == module) {
+  var checkJson, func, input;
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists))
+        .option('-u, --url <html_file>', 'Url to index.html')
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+
+    if (program.file) {
+      input = program.file;
+      func = localHtmlFile;
+    } else if (program.url) {
+      input = program.url;
+      func = restlerHtmlFile;
+    }
+
+    checkJson = func(input, function (data) {
+        var checkJson = checkHtmlFile(data, program.checks);
+        var outJson = JSON.stringify(checkJson, null, 4);
+        console.log(outJson);
+    });
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
