@@ -51,7 +51,7 @@ var restlerHtmlFile = function(url, callback) {
     if (result instanceof Error) {
         throw result;
     }
-    callback(result[0].message);
+    callback(result);
   });
 };
 
