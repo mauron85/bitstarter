@@ -1,7 +1,11 @@
+process.env.PWD = process.cwd();
+
 var express = require('express'),
     fs = require('fs');
 
 var app = express.createServer(express.logger());
+
+app.use(express.static(process.env.PWD));
 
 app.get('/', function(request, response) {
   var index = fs.readFileSync('index.html');
